@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   mariadb:
@@ -24,9 +24,11 @@ services:
     environment:
       MYSQL_PASSWORD_FILE: /run/secrets/db_password
       WP_ADMIN_PASSWORD_FILE: /run/secrets/wp_admin_password
+      WP_USER_PASSWORD_FILE: /run/secrets/wp_user_password
     secrets:
       - db_password
       - wp_admin_password
+      - wp_user_password
     volumes:
       - wp_data:/var/www/wordpress
     depends_on:
@@ -59,6 +61,8 @@ volumes:
     driver: local
 
 secrets:
+  wp_user_password:
+    file: ../secrets/wp_user_password.txt
   db_password:
     file: ../secrets/db_password.txt
   db_root_password:
