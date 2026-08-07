@@ -2,15 +2,11 @@
 
 services:
   mariadb:
-    build: requirements/mariadb
+    build: ./requirements/mariadb
+    image: mariadb
     container_name: mariadb
-    env_file: .env
-    environment:
-      MYSQL_PASSWORD_FILE: /run/secrets/db_password
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
-    secrets:
-      - db_password
-      - db_root_password
+    env_file:
+      - .env
     volumes:
       - db_data:/var/lib/mysql
     networks:
@@ -18,28 +14,26 @@ services:
     restart: unless-stopped
 
   wordpress:
-    build: requirements/wordpress
+    build: ./requirements/wordpress
+    image: wordpress
     container_name: wordpress
-    env_file: .env
-    environment:
-      MYSQL_PASSWORD_FILE: /run/secrets/db_password
-      WP_ADMIN_PASSWORD_FILE: /run/secrets/wp_admin_password
-      WP_USER_PASSWORD_FILE: /run/secrets/wp_user_password
-    secrets:
-      - db_password
-      - wp_admin_password
-      - wp_user_password
+    env_file:
+      - .env
     volumes:
       - wp_data:/var/www/wordpress
     depends_on:
       - mariadb
+      - redis
     networks:
       - inception
     restart: unless-stopped
 
   nginx:
-    build: requirements/nginx
+    build: ./requirements/nginx
+    image: nginx
     container_name: nginx
+    env_file:
+      - .env
     ports:
       - "443:443"
     volumes:
@@ -50,6 +44,39 @@ services:
       - inception
     restart: unless-stopped
 
+  adminer:
+    build: ./requirements/bonus/adminer
+    image: adminer
+    container_name: adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - inception
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+
+
+  redis:
+    build: ./requirements/bonus/redis
+    image: redis
+    container_name: inception-redis
+    networks:
+      - inception
+    restart: unless-stopped
+
+
+  static_website:
+    build: ./requirements/bonus/static_website
+    image: static_website
+    container_name: inception-static_website
+    ports:
+      - "122:80"
+    networks:
+      - inception
+    restart: unless-stopped
+
+
 networks:
   inception:
     driver: bridge
@@ -57,15 +84,14 @@ networks:
 volumes:
   db_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/malika/data/mariadb
+
   wp_data:
     driver: local
-
-secrets:
-  wp_user_password:
-    file: ../secrets/wp_user_password.txt
-  db_password:
-    file: ../secrets/db_password.txt
-  db_root_password:
-    file: ../secrets/db_root_password.txt
-  wp_admin_password:
-    file: ../secrets/wp_admin_password.txt
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/malika/data/wordpress

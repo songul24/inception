@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# Read secrets from files (mounted via Docker secrets/_FILE pattern)
-MYSQL_PASSWORD=$(cat "$MYSQL_PASSWORD_FILE")
-MYSQL_ROOT_PASSWORD=$(cat "$MYSQL_ROOT_PASSWORD_FILE")
+
 
 # Create the socket/runtime directory MariaDB needs before it can start
 mkdir -p /run/mysqld
@@ -23,5 +21,53 @@ GRANT ALL PRIVILEGES ON $MYSQL_DATABASE.* TO 'root'@'%' IDENTIFIED BY '$MYSQL_RO
 FLUSH PRIVILEGES;
 EOF
 
-# Start MariaDB as PID 1 in foreground so it receives signals correctly
+
 exec mysqld --user=mysql
+
+
+
+
+
+
+# #!/bin/bash
+# set -e
+
+# # Runtime directory MariaDB needs / give ownership to mysql
+# mkdir -p /run/mysqld
+# chown -R mysql:mysql /run/mysqld
+
+
+
+# # Initialize MariaDB only once
+# # if [ ! -d "/var/lib/mysql/mysql" ]; then
+    
+#     mysql_install_db --user=mysql --datadir=/var/lib/mysql
+
+#     # Start MariaDB temporarily in the background
+#     mysqld --user=mysql &
+#     MYSQL_PID=$!
+
+#     # Wait until MariaDB is ready
+#     until mysqladmin ping --silent; do
+#         sleep 1
+#     done
+
+#     # Configure MariaDB
+#     # mysql -u root <<EOF
+#     mariadb -uroot --protocol=SOCKET <<EOF
+# ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
+# CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;
+# CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+# GRANT ALL PRIVILEGES ON $MYSQL_DATABASE.* TO '$MYSQL_USER'@'%';
+# FLUSH PRIVILEGES;
+# EOF
+
+#     # Stop the temporary MariaDB server
+#     mysqladmin -u root -p"$MYSQL_ROOT_PASSWORD" shutdown
+
+#     # Wait until it has completely exited
+#     wait $MYSQL_PID
+# # fi
+
+# # Start the real MariaDB server as PID 1
+# exec mysqld --user=mysql

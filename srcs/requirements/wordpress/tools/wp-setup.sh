@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# --- Read secrets from files instead of plain env vars ---
-WP_USER_PASSWORD=$(cat "$WP_USER_PASSWORD_FILE")
-MYSQL_PASSWORD=$(cat "$MYSQL_PASSWORD_FILE")
-WP_ADMIN_PASSWORD=$(cat "$WP_ADMIN_PASSWORD_FILE")
 
 # --- Wait until MariaDB is actually accepting connections ---
 until mysqladmin ping -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent; do
@@ -16,7 +12,7 @@ echo "MariaDB is up!"
 mkdir -p /var/www/wordpress
 cd /var/www/wordpress || exit 1
 
-if [ ! -f wp-config.php ]; then
+if ! wp core is-installed --allow-root >/dev/null 2>&1; then
     echo "Downloading WordPress..."
     wp core download --allow-root
 
@@ -36,6 +32,13 @@ if [ ! -f wp-config.php ]; then
         --admin_password="$WP_ADMIN_PASSWORD" \
         --admin_email="$WP_ADMIN_EMAIL" \
         --allow-root
+    # Install and activate the Redis Object Cache plugin
+    wp plugin install redis-cache --activate --allow-root --path=/var/www/wordpress
+    
+    # Tell WordPress where Redis lives, then turn caching on
+    wp config set WP_REDIS_HOST redis --allow-root --path=/var/www/wordpress
+    wp redis enable --allow-root --path=/var/www/wordpress
+
 
     echo "Creating second (non-admin) user..."
     wp user create "$WP_USER" "$WP_USER_EMAIL" \
