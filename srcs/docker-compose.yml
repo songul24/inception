@@ -60,7 +60,11 @@ services:
   redis:
     build: ./requirements/bonus/redis
     image: redis
-    container_name: inception-redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - rd_data:/data
     networks:
       - inception
     restart: unless-stopped
@@ -69,9 +73,22 @@ services:
   static_website:
     build: ./requirements/bonus/static_website
     image: static_website
-    container_name: inception-static_website
+    container_name: static_website
     ports:
       - "122:80"
+    networks:
+      - inception
+    restart: unless-stopped
+
+  portainer:
+    build: ./requirements/bonus/portainer
+    image: portainer
+    container_name: portainer
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - por_data:/data
     networks:
       - inception
     restart: unless-stopped
@@ -95,3 +112,9 @@ volumes:
       type: none
       o: bind
       device: /home/malika/data/wordpress
+
+  rd_data:
+    driver: local
+
+  por_data:
+    driver: local
