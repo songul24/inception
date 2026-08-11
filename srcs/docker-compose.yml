@@ -94,6 +94,26 @@ services:
     restart: unless-stopped
 
 
+  ftp:
+    build: ./requirements/bonus/ftp
+    image: ftp
+    container_name: ftp
+    depends_on:
+      - wordpress
+    env_file:
+      - .env
+    ports:
+      - "21:21"
+      - "21100-21110:21100-21110"
+    volumes:
+      - wp_data:/var/www/wordpress
+    networks:
+      - inception
+    restart: unless-stopped
+
+
+
+
 networks:
   inception:
     driver: bridge
@@ -115,6 +135,14 @@ volumes:
 
   rd_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/malika/data/redis
 
   por_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/malika/data/portainer

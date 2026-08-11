@@ -7,6 +7,5 @@ RUN apt-get update && apt-get install -y \
 COPY tools/setup.sh /setup.sh
 RUN chmod +x /setup.sh
 
-EXPOSE 6379
 
 CMD ["/setup.sh"]

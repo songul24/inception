@@ -1,63 +1,155 @@
 # Developer Documentation
 
-## Project structure
+## Project Structure
 
+```text
 inception/
 ├── Makefile
 ├── secrets/
-│ ├── db_password.txt
-│ ├── db_root_password.txt
-│ ├── wp_admin_password.txt
-│ └── wp_user_password.txt
-└── srcs/
-├── .env
-├── docker-compose.yml
-└── requirements/
-├── mariadb/
-│ ├── Dockerfile
-│ ├── conf/my.cnf
-│ └── tools/init.sh
-├── nginx/
-│ ├── Dockerfile
-│ └── conf/nginx.conf
-└── wordpress/
-├── Dockerfile
-└── tools/wp-setup.sh
+├── srcs/
+│   ├── .env
+│   ├── docker-compose.yml
+│   └── requirements/
+│       ├── mariadb/
+│       ├── nginx/
+│       └── wordpress/
+```
 
-## Container responsibilities
+The bonus services have their own requirement directories.
 
-**MariaDB** (`requirements/mariadb/`)
-- Installs `mariadb-server` on `debian:bookworm`
-- `conf/my.cnf` sets `bind-address = 0.0.0.0` so WordPress (a different container) can connect
-- `tools/init.sh` initializes the data directory on first run only, creates the `wordpress` DB, `wpuser`, and root account, then execs `mysqld` as PID 1
+## Setup
 
-**WordPress** (`requirements/wordpress/`)
-- Installs PHP-FPM 8.2 + required extensions (mysqli, gd, curl, xml, mbstring), plus `wp-cli`
-- Patches PHP-FPM's pool config from a Unix socket to TCP (`0.0.0.0:9000`) so NGINX, running in a separate container, can reach it over FastCGI
-- `tools/wp-setup.sh` waits for MariaDB (`mysqladmin ping`), downloads WordPress via `wp-cli` only if `wp-config.php` doesn't already exist (idempotent across restarts), creates the admin (`superadmin`) and a second non-admin user (`johndoe`, role `author`), then execs `php-fpm8.2` in the foreground as PID 1
+Requirements:
 
-**NGINX** (`requirements/nginx/`)
-- Installs `nginx` + `openssl`
-- Generates a self-signed TLS certificate at build time
-- `conf/nginx.conf` listens only on 443 (TLSv1.2/1.3), proxies `.php` requests to `wordpress:9000` via FastCGI, serves static files directly from the shared `wp_data` volume
+- Docker
+- Docker Compose
+- Make
 
-## Networking & volumes
+Configuration is stored in:
 
-- All three services sit on one Docker bridge network (`inception`), giving them DNS resolution by service name
-- `wp_data` is mounted at `/var/www/wordpress` in **both** the WordPress and NGINX containers — this is what lets NGINX serve WordPress's actual theme/plugin/upload files (CSS, JS, images) directly, instead of 404s or stale content
-- `db_data` persists MariaDB's data directory across container restarts
+```text
+srcs/.env
+```
 
-## Troubleshooting notes (real issues hit during development)
+Passwords are stored in:
 
-- **PHP-FPM socket vs TCP**: Debian's default PHP-FPM pool config listens on a Unix socket, which only works for processes on the same filesystem. Since NGINX and WordPress are separate containers, the pool config needed patching via `sed` to listen on `0.0.0.0:9000` (TCP) instead.
-- **Docker Compose DNS**: hostnames like `wordpress` only resolve inside the `docker-compose.yml`-defined network. Testing a container standalone (`docker run` without compose) will correctly fail with "host not found" — that's expected, not a bug, if the upstream service name is referenced.
-- **Idempotent setup**: `wp-setup.sh` checks for `wp-config.php` before running installation steps, so restarting the WordPress container doesn't wipe or reinitialize an existing site.
-- **Version pinning**: Debian Bookworm ships PHP 8.2 by default (not 7.4) — always confirm actual installed binaries with `ls /usr/sbin/ | grep php-fpm` rather than assuming a version.
+```text
+secrets/
+```
 
-## Rebuilding from scratch
+## Build and Launch
+
+```bash
+make up
+```
+
+Or:
+
+```bash
+docker compose -f srcs/docker-compose.yml build
+docker compose -f srcs/docker-compose.yml up -d
+```
+
+Full rebuild:
 
 ```bash
 make fclean
 docker compose -f srcs/docker-compose.yml build --no-cache
 make up
 ```
+
+## Useful Commands
+
+```bash
+docker compose -f srcs/docker-compose.yml ps
+docker compose -f srcs/docker-compose.yml logs -f
+docker logs <container>
+docker exec -it <container> bash
+```
+
+## Data Persistence
+
+```text
+db_data
+└── MariaDB data
+
+wp_data
+└── WordPress files
+```
+
+`wp_data` is shared by WordPress and NGINX.
+
+## Networking
+
+All services use the `inception` Docker bridge network.
+
+Services can communicate using Docker DNS:
+
+```text
+wordpress
+mariadb
+redis
+```
+
+PHP-FPM listens on `0.0.0.0:9000` because NGINX runs in a separate container and communicates with it over the Docker network.
+
+## Bonus Services
+
+### Redis
+
+Redis runs on port `6379` and provides WordPress object caching.
+
+The Redis Object Cache plugin connects WordPress to:
+
+```text
+redis:6379
+```
+
+### FTP
+
+FTP provides access to the WordPress files.
+
+```text
+21              → control connection
+21100-21110     → passive data connections
+```
+
+The FTP service shares the WordPress volume.
+
+### Portainer
+
+Portainer provides Docker management through a web interface.
+
+It communicates with Docker through:
+
+```text
+/var/run/docker.sock
+```
+
+and stores its own data in a persistent volume.
+
+### Adminer
+
+Adminer provides a web interface for managing MariaDB. It connects to MariaDB through the Docker network.
+
+### Static Website
+
+The static website is an independent service serving static HTML/CSS/JavaScript files.
+
+## Troubleshooting
+
+Check all services:
+
+```bash
+docker compose -f srcs/docker-compose.yml ps
+```
+
+View logs:
+
+```bash
+docker compose -f srcs/docker-compose.yml logs -f
+```
+
+If WordPress cannot connect to MariaDB, check that both services are running and are on the same Docker network.
+
+If Redis is unavailable, check that the Redis container is running and that WordPress is configured with `redis` as its Redis host.

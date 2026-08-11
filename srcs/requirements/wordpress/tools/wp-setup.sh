@@ -8,12 +8,14 @@ until mysqladmin ping -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --sil
 done
 echo "MariaDB is up!"
 
-# --- Only install WordPress the FIRST time (skip if already configured) ---
+
 mkdir -p /var/www/wordpress
 cd /var/www/wordpress || exit 1
 
+
 if ! wp core is-installed --allow-root >/dev/null 2>&1; then
     echo "Downloading WordPress..."
+    #download WordPress core files using WP-CLI
     wp core download --allow-root
 
     echo "Creating wp-config.php..."
@@ -24,19 +26,23 @@ if ! wp core is-installed --allow-root >/dev/null 2>&1; then
         --dbhost="$MYSQL_HOST" \
         --allow-root
 
+    #set up WordPress with the provided parameters
     echo "Installing WordPress..."
     wp core install \
-        --url="$DOMAIN_NAME" \
+        --url="https://$DOMAIN_NAME" \
         --title="Inception" \
         --admin_user="$WP_ADMIN_USER" \
         --admin_password="$WP_ADMIN_PASSWORD" \
         --admin_email="$WP_ADMIN_EMAIL" \
         --allow-root
-    # Install and activate the Redis Object Cache plugin
+    
+    # Install and activate the Redis Object Cache Plugin
     wp plugin install redis-cache --activate --allow-root --path=/var/www/wordpress
     
-    # Tell WordPress where Redis lives, then turn caching on
+    # Tell WordPress where Redis's service name
     wp config set WP_REDIS_HOST redis --allow-root --path=/var/www/wordpress
+
+    # Enable Redis Object Cache
     wp redis enable --allow-root --path=/var/www/wordpress
 
 

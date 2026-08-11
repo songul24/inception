@@ -9,6 +9,7 @@ chown -R mysql:mysql /run/mysqld
 # Only initialize the data directory if it hasn't been done before
 if [ ! -d "/var/lib/mysql/mysql" ]; then
     mysql_install_db --user=mysql --datadir=/var/lib/mysql
+
 fi
 
 # Run SQL commands in bootstrap mode to create DB and users
@@ -20,7 +21,6 @@ GRANT ALL PRIVILEGES ON $MYSQL_DATABASE.* TO '$MYSQL_USER'@'%';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
 FLUSH PRIVILEGES;
 EOF
-
 
 exec mysqld --user=mysql
 
