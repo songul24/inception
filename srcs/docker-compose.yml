@@ -48,8 +48,8 @@ services:
     build: ./requirements/bonus/adminer
     image: adminer
     container_name: adminer
-    ports:
-      - "8081:8080"
+    expose:
+      - "8080"
     networks:
       - inception
     restart: unless-stopped
@@ -61,8 +61,6 @@ services:
     build: ./requirements/bonus/redis
     image: redis
     container_name: redis
-    ports:
-      - "6379:6379"
     volumes:
       - rd_data:/data
     networks:
@@ -74,8 +72,8 @@ services:
     build: ./requirements/bonus/static_website
     image: static_website
     container_name: static_website
-    ports:
-      - "122:80"
+    expose:
+      - "80"
     networks:
       - inception
     restart: unless-stopped
@@ -84,8 +82,8 @@ services:
     build: ./requirements/bonus/portainer
     image: portainer
     container_name: portainer
-    ports:
-      - "9443:9443"
+    expose:
+      - "9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - por_data:/data
@@ -117,6 +115,7 @@ services:
 networks:
   inception:
     driver: bridge
+    name: inception
 
 volumes:
   db_data:
@@ -124,25 +123,25 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/malika/data/mariadb
+      device: /home/machaouk/data/mariadb
 
   wp_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/malika/data/wordpress
+      device: /home/machaouk/data/wordpress
 
   rd_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/malika/data/redis
+      device: /home/machaouk/data/redis
 
   por_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/malika/data/portainer
+      device: /home/machaouk/data/portainer

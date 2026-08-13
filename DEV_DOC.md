@@ -1,155 +1,132 @@
 # Developer Documentation
 
-## Project Structure
+This document explains how to set up, build, and manage the Inception infrastructure as a
+developer.
 
-```text
+## 1. Project layout
+
+```
 inception/
 ├── Makefile
-├── secrets/
-├── srcs/
-│   ├── .env
-│   ├── docker-compose.yml
-│   └── requirements/
-│       ├── mariadb/
-│       ├── nginx/
-│       └── wordpress/
+└── srcs/
+    ├── .env                         # all config, including passwords (not committed)
+    ├── docker-compose.yml
+    └── requirements/
+        ├── mariadb/
+        ├── nginx/
+        ├── wordpress/
+        └── bonus/
+            ├── adminer/
+            ├── ftp/
+            ├── portainer/
+            ├── redis/
+            └── static_website/
 ```
 
-The bonus services have their own requirement directories.
+## 2. Setting up the environment from scratch
 
-## Setup
+### 2.1 Prerequisites
+- Linux host (or VM) with Docker Engine + Docker Compose plugin installed.
+- `machaouk.42.fr` resolving to `127.0.0.1` — add this to `/etc/hosts` on any machine you'll
+  browse from:
+  ```
+  127.0.0.1 machaouk.42.fr
+  ```
 
-Requirements:
-
-- Docker
-- Docker Compose
-- Make
-
-Configuration is stored in:
-
-```text
-srcs/.env
-```
-
-Passwords are stored in:
-
-```text
-secrets/
-```
-
-## Build and Launch
+### 2.2 Configuration & credentials (`srcs/.env`)
+All configuration, including passwords, lives in a single `srcs/.env` file. It is **not**
+committed to the repository — create it locally before building:
 
 ```bash
-make up
+DOMAIN_NAME=machaouk.42.fr
+
+MYSQL_DATABASE=wordpress
+MYSQL_USER=wpuser
+MYSQL_PASSWORD=changeme
+MYSQL_ROOT_PASSWORD=changeme
+
+WP_ADMIN_USER=superuser        # must NOT contain "admin"
+WP_ADMIN_PASSWORD=changeme
+WP_USER=malika
+WP_PASSWORD=changeme
+
+FTP_USER=ftpuser
+FTP_PASSWORD=changeme
 ```
 
-Or:
+Entrypoint scripts (`init.sh`, `wp-setup.sh`, etc.) read these directly as environment variables
+via Docker Compose's `env_file: srcs/.env`.
+
+## 3. Build and launch
+
+Everything is driven by the Makefile, which wraps Docker Compose:
 
 ```bash
-docker compose -f srcs/docker-compose.yml build
-docker compose -f srcs/docker-compose.yml up -d
+make            # build all images and start containers (detached)
+make down       # stop and remove containers, keep volumes/data
+make clean      # down + remove built images
+make fclean     # clean + remove data under /home/machaouk/data/
+make re         # fclean + make (full rebuild from a clean state)
 ```
 
-Full rebuild:
+Equivalent raw Compose commands, if needed directly:
+```bash
+docker compose -f srcs/docker-compose.yml up -d --build
+docker compose -f srcs/docker-compose.yml down
+docker compose -f srcs/docker-compose.yml down -v
+```
+
+> `docker compose down -v` removes named volumes but does **not** delete the underlying host
+> directories they're backed by — clean those manually (`sudo rm -rf /home/machaouk/data/*`).
+
+## 4. Managing containers and volumes
 
 ```bash
-make fclean
-docker compose -f srcs/docker-compose.yml build --no-cache
-make up
+docker compose -f srcs/docker-compose.yml ps            # status of all services
+docker compose -f srcs/docker-compose.yml logs -f nginx  # follow logs for one service
+docker exec -it wordpress bash                            # shell into a running container
+docker volume ls                                           # list volumes
 ```
 
-## Useful Commands
-
+Rebuilding a single service after editing its Dockerfile:
 ```bash
-docker compose -f srcs/docker-compose.yml ps
-docker compose -f srcs/docker-compose.yml logs -f
-docker logs <container>
-docker exec -it <container> bash
+docker compose -f srcs/docker-compose.yml up -d --build wordpress
 ```
 
-## Data Persistence
+## 5. Where data is stored / how it persists
 
-```text
-db_data
-└── MariaDB data
+All persistent data lives on the host under `/home/machaouk/data/`. Each service has a named
+volume (declared under the top-level `volumes:` key) whose `driver_opts` point the `local`
+driver at a specific host path instead of Docker's default volume location:
 
-wp_data
-└── WordPress files
+```yaml
+volumes:
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/machaouk/data/mariadb
+  wp_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/machaouk/data/wordpress
+  # rd_data, por_data follow the same pattern
 ```
 
-`wp_data` is shared by WordPress and NGINX.
+| Named volume | Host path | Mounted into | Contains |
+|---|---|---|---|
+| `db_data` | `/home/machaouk/data/mariadb/` | `mariadb:/var/lib/mysql` | Database files |
+| `wp_data` | `/home/machaouk/data/wordpress/` | `wordpress:/var/www/html` | WordPress core, themes, plugins, uploads |
+| `rd_data` | `/home/machaouk/data/redis/` | `redis:/data` | Redis persistence files |
+| `por_data` | `/home/machaouk/data/portainer/` | `portainer:/data` | Portainer settings/state |
 
-## Networking
-
-All services use the `inception` Docker bridge network.
-
-Services can communicate using Docker DNS:
-
-```text
-wordpress
-mariadb
-redis
-```
-
-PHP-FPM listens on `0.0.0.0:9000` because NGINX runs in a separate container and communicates with it over the Docker network.
-
-## Bonus Services
-
-### Redis
-
-Redis runs on port `6379` and provides WordPress object caching.
-
-The Redis Object Cache plugin connects WordPress to:
-
-```text
-redis:6379
-```
-
-### FTP
-
-FTP provides access to the WordPress files.
-
-```text
-21              → control connection
-21100-21110     → passive data connections
-```
-
-The FTP service shares the WordPress volume.
-
-### Portainer
-
-Portainer provides Docker management through a web interface.
-
-It communicates with Docker through:
-
-```text
-/var/run/docker.sock
-```
-
-and stores its own data in a persistent volume.
-
-### Adminer
-
-Adminer provides a web interface for managing MariaDB. It connects to MariaDB through the Docker network.
-
-### Static Website
-
-The static website is an independent service serving static HTML/CSS/JavaScript files.
-
-## Troubleshooting
-
-Check all services:
-
-```bash
-docker compose -f srcs/docker-compose.yml ps
-```
-
-View logs:
-
-```bash
-docker compose -f srcs/docker-compose.yml logs -f
-```
-
-If WordPress cannot connect to MariaDB, check that both services are running and are on the same Docker network.
-
-If Redis is unavailable, check that the Redis container is running and that WordPress is configured with `redis` as its Redis host.
+Because each volume is backed by a specific host path (rather than Docker's default
+`/var/lib/docker/volumes/...` location), you can inspect this data directly from the host without
+going through Docker — e.g. `ls /home/machaouk/data/wordpress/`. It's still a real Docker-managed
+volume (visible in `docker volume ls`), it's just not stored where Docker would put it by
+default. Data survives
+`docker compose down` and container rebuilds; it is only lost if you manually delete the host
+directory (as `make fclean` does on purpose).

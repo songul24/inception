@@ -22,7 +22,7 @@ GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
 FLUSH PRIVILEGES;
 EOF
 
-exec mysqld --user=mysql
+exec mariadbd --user=mysql
 
 
 
