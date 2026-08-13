@@ -20,4 +20,4 @@ RUN curl -L https://github.com/portainer/portainer/releases/download/2.39.5/port
 WORKDIR /app
 
 #start portainer and store data in /data
-CMD ["/app/portainer", "--data", "/data"]
+ENTRYPOINT ["/app/portainer", "--data", "/data"]

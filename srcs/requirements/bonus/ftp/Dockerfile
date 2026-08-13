@@ -10,6 +10,4 @@ COPY conf/vsftpd.conf /etc/vsftpd.conf
 COPY tools/ftp.sh /ftp.sh
 RUN chmod +x /ftp.sh
 
-
-
-CMD ["/ftp.sh"]
+ENTRYPOINT ["/ftp.sh"]
